@@ -1,30 +1,34 @@
 --[[
 	SuzyFinder UI (LocalScript)
-	Apenas interface: sem teleport, sem automações extras, sem HTTP.
+	UI + Status + Leitura HTTP
 ]]
 
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+
+-- ===== CONFIG =====
+local CHECK_INTERVAL = 5
+local SERVER_URL = "http://SEU_IP:5000/server" -- ex: http://192.168.0.14:5000/server
+-- ==================
 
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
--- Remove UI antiga, se existir
+-- Remove UI antiga
 local oldGui = playerGui:FindFirstChild("SuzyFinderUI")
 if oldGui then
 	oldGui:Destroy()
 end
 
--- Cria ScreenGui
+-- ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SuzyFinderUI"
 screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = playerGui
 
 -- Frame principal
 local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.fromOffset(300, 160)
+mainFrame.Size = UDim2.fromOffset(320, 190)
 mainFrame.Position = UDim2.fromScale(0.5, 0.5)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -35,11 +39,9 @@ local frameCorner = Instance.new("UICorner")
 frameCorner.CornerRadius = UDim.new(0, 10)
 frameCorner.Parent = mainFrame
 
--- Título no canto superior esquerdo
+-- Título
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Name = "TitleLabel"
 titleLabel.BackgroundTransparency = 1
-titleLabel.BorderSizePixel = 0
 titleLabel.Size = UDim2.new(1, -20, 0, 28)
 titleLabel.Position = UDim2.fromOffset(10, 8)
 titleLabel.Text = "SuzyFinder"
@@ -47,52 +49,83 @@ titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 20
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.TextYAlignment = Enum.TextYAlignment.Center
 titleLabel.Parent = mainFrame
 
--- Label da fruta
+-- Status
+local statusLabel = Instance.new("TextLabel")
+statusLabel.BackgroundTransparency = 1
+statusLabel.Size = UDim2.new(1, -20, 0, 24)
+statusLabel.Position = UDim2.fromOffset(10, 42)
+statusLabel.Text = "Status: Aguardando fruta..."
+statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 14
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = mainFrame
+
+-- Fruta
 local fruitLabel = Instance.new("TextLabel")
-fruitLabel.Name = "FruitLabel"
 fruitLabel.BackgroundTransparency = 1
-fruitLabel.BorderSizePixel = 0
-fruitLabel.Size = UDim2.new(1, -20, 0, 28)
-fruitLabel.Position = UDim2.fromOffset(10, 60)
-fruitLabel.Text = "Fruit: Leopard"
+fruitLabel.Size = UDim2.new(1, -20, 0, 26)
+fruitLabel.Position = UDim2.fromOffset(10, 76)
+fruitLabel.Text = "Fruit: -"
 fruitLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 fruitLabel.Font = Enum.Font.Gotham
 fruitLabel.TextSize = 16
 fruitLabel.TextXAlignment = Enum.TextXAlignment.Left
-fruitLabel.TextYAlignment = Enum.TextYAlignment.Center
 fruitLabel.Parent = mainFrame
 
--- Label do servidor
+-- Server ID
 local serverIdLabel = Instance.new("TextLabel")
-serverIdLabel.Name = "ServerIdLabel"
 serverIdLabel.BackgroundTransparency = 1
-serverIdLabel.BorderSizePixel = 0
-serverIdLabel.Size = UDim2.new(1, -20, 0, 28)
-serverIdLabel.Position = UDim2.fromOffset(10, 94)
-serverIdLabel.Text = "Server ID: abc123"
+serverIdLabel.Size = UDim2.new(1, -20, 0, 26)
+serverIdLabel.Position = UDim2.fromOffset(10, 108)
+serverIdLabel.Text = "Server ID: -"
 serverIdLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 serverIdLabel.Font = Enum.Font.Gotham
 serverIdLabel.TextSize = 16
 serverIdLabel.TextXAlignment = Enum.TextXAlignment.Left
-serverIdLabel.TextYAlignment = Enum.TextYAlignment.Center
 serverIdLabel.Parent = mainFrame
 
--- Funções para atualização fácil dos textos
+-- ===== Funções de UI =====
+local function setStatus(text)
+	statusLabel.Text = "Status: " .. text
+end
+
 local function setFruit(name)
-	fruitLabel.Text = string.format("Fruit: %s", tostring(name or "Unknown"))
+	fruitLabel.Text = "Fruit: " .. tostring(name or "-")
 end
 
 local function setServerId(id)
-	serverIdLabel.Text = string.format("Server ID: %s", tostring(id or "N/A"))
+	serverIdLabel.Text = "Server ID: " .. tostring(id or "-")
 end
 
--- Exemplo de atualização inicial (pode alterar conforme necessário)
-setFruit("Leopard")
-setServerId("abc123")
-
--- Exporta funções no ambiente global para facilitar uso em executor
+-- Exporta (opcional)
+getgenv().setStatus = setStatus
 getgenv().setFruit = setFruit
 getgenv().setServerId = setServerId
+
+-- ===== Loop HTTP =====
+task.spawn(function()
+	while true do
+		task.wait(CHECK_INTERVAL)
+
+		local success, response = pcall(function()
+			return HttpService:GetAsync(SERVER_URL)
+		end)
+
+		if success then
+			local data = HttpService:JSONDecode(response)
+
+			if data.server_id and data.server_id ~= "" then
+				setStatus("Fruta encontrada")
+				setFruit(data.fruit)
+				setServerId(data.server_id)
+			else
+				setStatus("Aguardando fruta...")
+			end
+		else
+			setStatus("Erro ao conectar")
+		end
+	end
+end)
