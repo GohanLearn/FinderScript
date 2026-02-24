@@ -8,7 +8,7 @@ local HttpService = game:GetService("HttpService")
 
 -- ===== CONFIG =====
 local CHECK_INTERVAL = 5
-local SERVER_URL = "http://SEU_IP:5000/server" -- ex: http://192.168.0.14:5000/server
+local SERVER_URL = "http://192.168.0.14:5000/server"
 -- ==================
 
 local localPlayer = Players.LocalPlayer
